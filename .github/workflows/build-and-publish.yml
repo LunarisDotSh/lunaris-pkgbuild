@@ -1,0 +1,60 @@
+name: Build and Publish Package
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - '**/PKGBUILD'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    container: archlinux:latest 
+    
+    steps:
+      - name: Install Git
+        run: pacman -Sy --noconfirm git
+
+      - name: Checkout PKGBUILD repository
+        uses: actions/checkout@v4
+        
+      - name: Install build dependencies
+        run: |
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm base-devel
+          
+      - name: Build the package
+        run: |
+          PKG_DIR=$(find . -name "PKGBUILD" -exec dirname {} \; | head -n 1)
+          
+          if [ -z "$PKG_DIR" ] || [ "$PKG_DIR" = "." ]; then
+            exit 1
+          fi
+          
+          cd "$PKG_DIR"
+          
+          useradd -m builder
+          chown -R builder:builder .
+          
+          su builder -c "makepkg -s --noconfirm"
+          
+      - name: Checkout Binary Repository
+        uses: actions/checkout@v4
+        with:
+          repository: LunarisDotSh/lunaris-arch-repo
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          path: lunaris-arch-repo
+          
+      - name: Publish to Binary Repository
+        run: |
+          cd lunaris-arch-repo
+          
+          find .. -name "*.pkg.tar.zst" -exec cp {} . \;
+          
+          repo-add -n -R lunaris-arch-repo.db.tar.gz *.pkg.tar.zst
+          
+          git config --global user.name "Lunaris Builder"
+          git config --global user.email "builder@lunaris.sh"
+          git add -A
+          git commit -m "chore: auto-build and update repository database [skip ci]" || exit 0
+          git push
