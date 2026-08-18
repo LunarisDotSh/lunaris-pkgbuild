@@ -12,16 +12,13 @@ jobs:
     container: archlinux:latest 
     
     steps:
-      - name: Install Git
-        run: pacman -Sy --noconfirm git
-
       - name: Checkout PKGBUILD repository
         uses: actions/checkout@v4
         
       - name: Install build dependencies
         run: |
-          pacman -Sy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm base-devel
+          pacman -Syy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm base-devel git pacman-contrib sudo
           
       - name: Build the package
         run: |
@@ -36,7 +33,7 @@ jobs:
           useradd -m builder
           chown -R builder:builder .
           
-          su builder -c "makepkg -s --noconfirm"
+          su builder -c "makepkg -fis --noconfirm"
           
       - name: Checkout Binary Repository
         uses: actions/checkout@v4
