@@ -47,14 +47,29 @@ jobs:
           
       - name: Publish to Binary Repository
         run: |
-          cd lunaris-arch-repo
-          
-          find .. -name "*.pkg.tar.zst" -exec cp {} . \;
-          
-          repo-add -n -R lunaris-arch-repo.db.tar.gz *.pkg.tar.zst
-          
-          git config --global user.name "Lunaris Builder"
-          git config --global user.email "builder@lunaris.sh"
-          git add -A
-          git commit -m "chore: auto-build and update repository database [skip ci]" || exit 0
-          git push
+            # Format date
+            date_format="$(date +"%Y-%m-%d %H:%M")"
+
+            cd lunaris-arch-repo
+
+            find .. -name "*.pkg.tar.zst" -exec cp {} . \;
+
+            # Create database
+            repo-add -n -R lunaris-arch-repo.db.tar.gz *.pkg.tar.zst
+
+            # Fix synlinks
+            rm -f lunaris-arch-repo.db lunaris-arch-repo.files
+            mv lunaris-arch-repo.db.tar.gz lunaris-arch-repo.db
+            mv lunaris-arch-repo.files.tar.gz lunaris-arch-repo.files
+
+            # Git identity
+            git config --global user.name "Lunaris Builder"
+            git config --global user.email "builder@lunaris.sh"
+
+            # Add changed files
+            git add -A
+            git diff --cached --quiet && exit 0
+
+            # Push changes
+            git commit -m "chore(repo): update database: $date_format" || exit 0
+            git push
