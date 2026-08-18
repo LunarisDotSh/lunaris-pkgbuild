@@ -22,18 +22,28 @@ jobs:
           
       - name: Build the package
         run: |
-          PKG_DIR=$(find . -name "PKGBUILD" -exec dirname {} \; | head -n 1)
-          
-          [ -z "$PKG_DIR" ] || [ "$PKG_DIR" = "." ] && exit 1
-          
-          cd "$PKG_DIR"
-          
           useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
           echo "Defaults lecture = never" >> /etc/sudoers
-          chown -R builder:builder .
-          
-          su builder -c "makepkg -fs --noconfirm"
+          echo 'PACKAGER="${{ vars.PACKAGER_VALUE }}"' >> /etc/makepkg.conf
+          chown -R builder:builder $GITHUB_WORKSPACE
+
+          mapfile -d '' PKG_DIRS < <(find . -name "PKGBUILD" -print0 | xargs -0 -n1 dirname | tr '\n' '\0')
+
+          if [ ${#PKG_DIRS[@]} -eq 0 ]; then
+            echo "No PKGBUILDs found."
+            exit 0
+          fi
+
+          runuser -u builder -- bash -c '
+            set -e
+            mapfile -d '' DIRS < <(find . -name "PKGBUILD" -exec dirname {} \;)
+            for pkg in "${DIRS[@]}"; do
+              cd "$pkg"
+              makepkg -fs --noconfirm
+              cd - > /dev/null
+            done
+          '
           
       - name: Checkout Binary Repository
         uses: actions/checkout@v4
