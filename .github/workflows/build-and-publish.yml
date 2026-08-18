@@ -31,9 +31,11 @@ jobs:
           cd "$PKG_DIR"
           
           useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          echo "Defaults lecture = never" >> /etc/sudoers
           chown -R builder:builder .
           
-          su builder -c "makepkg -fis --noconfirm"
+          su builder -c "makepkg -fs --noconfirm"
           
       - name: Checkout Binary Repository
         uses: actions/checkout@v4
