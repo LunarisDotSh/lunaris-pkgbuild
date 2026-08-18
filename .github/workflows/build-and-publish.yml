@@ -48,6 +48,9 @@ jobs:
           pacman -Syy --noconfirm archlinux-keyring
           pacman -Sy --noconfirm --needed base-devel sudo
 
+          # Package specifics
+          pacman -S --noconfirm --needed libx11 libxrender libxext
+
       - name: Build packages
         run: |
           # Create builder user and set permissions
