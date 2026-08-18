@@ -24,9 +24,7 @@ jobs:
         run: |
           PKG_DIR=$(find . -name "PKGBUILD" -exec dirname {} \; | head -n 1)
           
-          if [ -z "$PKG_DIR" ] || [ "$PKG_DIR" = "." ]; then
-            exit 1
-          fi
+          [ -z "$PKG_DIR" ] || [ "$PKG_DIR" = "." ] && exit 1
           
           cd "$PKG_DIR"
           
@@ -58,12 +56,12 @@ jobs:
             cd x86_64
 
             # Create database
-            repo-add -n -R lunaris-arch-repo.db.tar.gz *.pkg.tar.zst
+            repo-add -n -R lunaris.db.tar.gz *.pkg.tar.zst
 
             # Fix synlinks
-            rm -f lunaris-arch-repo.db lunaris-arch-repo.files
-            mv lunaris-arch-repo.db.tar.gz lunaris-arch-repo.db
-            mv lunaris-arch-repo.files.tar.gz lunaris-arch-repo.files
+            rm -f lunaris.db lunaris.files
+            mv lunaris.db.tar.gz lunaris.db
+            mv lunaris.files.tar.gz lunaris.files
 
             cd ..
 
