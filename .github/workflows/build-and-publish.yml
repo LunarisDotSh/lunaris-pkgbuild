@@ -35,16 +35,13 @@ jobs:
             exit 0
           fi
 
-          runuser -u builder -- bash -c '
-            set -e
-            mapfile -d '' DIRS < <(find . -name "PKGBUILD" -exec dirname {} \;)
-            for pkg in "${DIRS[@]}"; do
-              cd "$pkg"
-              makepkg -fs --noconfirm
-              cd - > /dev/null
-            done
-          '
-          
+          for pkg in "${PKG_DIRS[@]}"; do
+            echo "Building in: $pkg"
+            sudo -u builder bash -c "cd \"$pkg\" && makepkg -fs --noconfirm"
+          done
+
+        shell: bash
+
       - name: Checkout Binary Repository
         uses: actions/checkout@v4
         with:
