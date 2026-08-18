@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: LunarisDotSh/lunaris-arch-repo
-          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          token: ${{ secrets.REPO_PAT }}
           path: lunaris-arch-repo
           
       - name: Publish to Binary Repository
