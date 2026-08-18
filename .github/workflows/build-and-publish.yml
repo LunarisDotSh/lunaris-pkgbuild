@@ -2,42 +2,44 @@ name: Build and Publish Package
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
     paths:
-      - '**/PKGBUILD'
+      - "**/PKGBUILD"
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    container: archlinux:latest 
-    
+    container: archlinux:latest
+
     steps:
       - name: Checkout PKGBUILD repository
         uses: actions/checkout@v4
-        
+        with:
+          fetch-depth: 2
+
       - name: Install build dependencies
         run: |
           pacman -Syy --noconfirm archlinux-keyring
-          pacman -Syu --noconfirm base-devel git pacman-contrib sudo
-          
-      - name: Build the package
+          pacman -Sy --noconfirm --needed base-devel git sudo
+
+      - name: Build packages
         run: |
+          # Create builder user and set permissions
           useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
           echo "Defaults lecture = never" >> /etc/sudoers
           echo 'PACKAGER="${{ vars.PACKAGER_VALUE }}"' >> /etc/makepkg.conf
           chown -R builder:builder $GITHUB_WORKSPACE
 
-          mapfile -d '' PKG_DIRS < <(find . -name "PKGBUILD" -print0 | xargs -0 -n1 dirname | tr '\n' '\0')
+          # Find directories where a PKGBUILD was added or modified
+          PKG_DIRS=$(git diff --name-only HEAD^ HEAD | grep '/PKGBUILD$' | xargs -n1 dirname | sort -u)
 
-          if [ ${#PKG_DIRS[@]} -eq 0 ]; then
-            echo "No PKGBUILDs found."
-            exit 0
-          fi
+          # Exit safeguard
+          [ -z "$PKG_DIRS" ] && exit 0
 
+          # Build packages
           for pkg in "${PKG_DIRS[@]}"; do
-            echo "Building in: $pkg"
-            sudo -u builder bash -c "cd \"$pkg\" && makepkg -fs --noconfirm"
+            sudo -u builder bash -c "cd \"$pkg\" && makepkg -d --noconfirm"
           done
 
         shell: bash
@@ -48,38 +50,38 @@ jobs:
           repository: LunarisDotSh/lunaris-arch-repo
           token: ${{ secrets.REPO_PAT }}
           path: lunaris-arch-repo
-          
+
       - name: Publish to Binary Repository
         run: |
-            # Format date
-            date_format="$(date +"%Y-%m-%d %H:%M")"
+          # Format date
+          date_format="$(date +"%Y-%m-%d %H:%M")"
 
-            cd lunaris-arch-repo
+          # Create arch directory
+          cd lunaris-arch-repo
+          mkdir -p x86_64
 
-            mkdir -p x86_64
+          # Find builded packages
+          find .. -name "*.pkg.tar.zst" -exec cp {} x86_64/ \;
 
-            find .. -name "*.pkg.tar.zst" -exec cp {} x86_64/ \;
+          # Create database
+          cd x86_64
+          repo-add -n -R lunaris.db.tar.gz *.pkg.tar.zst
 
-            cd x86_64
+          # Fix synlinks
+          rm -f lunaris.db lunaris.files
+          mv lunaris.db.tar.gz lunaris.db
+          mv lunaris.files.tar.gz lunaris.files
 
-            # Create database
-            repo-add -n -R lunaris.db.tar.gz *.pkg.tar.zst
+          cd ..
 
-            # Fix synlinks
-            rm -f lunaris.db lunaris.files
-            mv lunaris.db.tar.gz lunaris.db
-            mv lunaris.files.tar.gz lunaris.files
+          # Git identity
+          git config --global user.name "Lunaris Builder"
+          git config --global user.email "builder@lunaris.sh"
 
-            cd ..
+          # Add changed files
+          git add -A
+          git diff --cached --quiet && exit 0
 
-            # Git identity
-            git config --global user.name "Lunaris Builder"
-            git config --global user.email "builder@lunaris.sh"
-
-            # Add changed files
-            git add -A
-            git diff --cached --quiet && exit 0
-
-            # Push changes
-            git commit -m "chore(repo): update database: $date_format" || exit 0
-            git push
+          # Push changes
+          git commit -m "chore(repo): update database: $date_format" || exit 0
+          git push
