@@ -53,7 +53,7 @@ jobs:
 
             mkdir -p x86_64
 
-            find .. -name "*.pkg.tar.zst" -exec cp {} . \;
+            find .. -name "*.pkg.tar.zst" -exec cp {} x86_64/ \;
 
             cd x86_64
 
