@@ -12,6 +12,9 @@ jobs:
     container: archlinux:latest
 
     steps:
+      - name: Install Git
+        run: pacman -Sy --noconfirm git
+        
       - name: Checkout PKGBUILD repository
         uses: actions/checkout@v4
         with:
@@ -20,7 +23,7 @@ jobs:
       - name: Install build dependencies
         run: |
           pacman -Syy --noconfirm archlinux-keyring
-          pacman -Sy --noconfirm --needed base-devel git sudo
+          pacman -Sy --noconfirm --needed base-devel sudo
 
       - name: Build packages
         run: |
@@ -32,7 +35,7 @@ jobs:
           chown -R builder:builder $GITHUB_WORKSPACE
 
           # Find directories where a PKGBUILD was added or modified
-          PKG_DIRS=$(git diff --name-only HEAD^ HEAD | grep '/PKGBUILD$' | xargs -n1 dirname | sort -u)
+          PKG_DIRS=$(git diff --name-only HEAD^ HEAD 2>/dev/null | grep '/PKGBUILD$' | xargs -r -n1 dirname | sort -u)
 
           # Exit safeguard
           [ -z "$PKG_DIRS" ] && exit 0
