@@ -51,7 +51,11 @@ jobs:
 
             cd lunaris-arch-repo
 
+            mkdir -p x86_64
+
             find .. -name "*.pkg.tar.zst" -exec cp {} . \;
+
+            cd x86_64
 
             # Create database
             repo-add -n -R lunaris-arch-repo.db.tar.gz *.pkg.tar.zst
@@ -60,6 +64,8 @@ jobs:
             rm -f lunaris-arch-repo.db lunaris-arch-repo.files
             mv lunaris-arch-repo.db.tar.gz lunaris-arch-repo.db
             mv lunaris-arch-repo.files.tar.gz lunaris-arch-repo.files
+
+            cd ..
 
             # Git identity
             git config --global user.name "Lunaris Builder"
