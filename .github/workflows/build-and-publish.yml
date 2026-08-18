@@ -13,14 +13,37 @@ jobs:
 
     steps:
       - name: Install Git
-        run: pacman -Sy --noconfirm git
+        run: pacman -Sy --noconfirm git --needed
         
       - name: Checkout PKGBUILD repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
+      - name: Check for changed PKGBUILDs
+        id: check
+        run: |
+          # Check if HEAD^ exists
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only HEAD^ HEAD | grep '/PKGBUILD$' || true)
+          else
+            # First commit, treat all PKGBUILDs as changed
+            CHANGED=$(find . -name "PKGBUILD" | sed 's|^\./||' || true)
+          fi
+          
+          if [ -z "$CHANGED" ]; then
+            echo "No PKGBUILDs changed."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            # Extract directories and format the loop
+            DIRS=$(echo "$CHANGED" | xargs -n1 dirname | sort -u | tr '\n' ' ')
+            echo "dirs=$DIRS" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
       - name: Install build dependencies
+        if: steps.check.outputs.skip != 'true'
         run: |
           pacman -Syy --noconfirm archlinux-keyring
           pacman -Sy --noconfirm --needed base-devel sudo
@@ -34,20 +57,15 @@ jobs:
           echo 'PACKAGER="${{ vars.PACKAGER_VALUE }}"' >> /etc/makepkg.conf
           chown -R builder:builder $GITHUB_WORKSPACE
 
-          # Find directories where a PKGBUILD was added or modified
-          PKG_DIRS=$(git diff --name-only HEAD^ HEAD 2>/dev/null | grep '/PKGBUILD$' | xargs -r -n1 dirname | sort -u)
-
-          # Exit safeguard
-          [ -z "$PKG_DIRS" ] && exit 0
-
           # Build packages
-          for pkg in "${PKG_DIRS[@]}"; do
+          for pkg in ${{ steps.check.outputs.dirs }}; do
             sudo -u builder bash -c "cd \"$pkg\" && makepkg -d --noconfirm"
           done
 
         shell: bash
 
       - name: Checkout Binary Repository
+        if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v4
         with:
           repository: LunarisDotSh/lunaris-arch-repo
@@ -55,6 +73,7 @@ jobs:
           path: lunaris-arch-repo
 
       - name: Publish to Binary Repository
+        if: steps.check.outputs.skip != 'true'
         run: |
           # Format date
           date_format="$(date +"%Y-%m-%d %H:%M")"
